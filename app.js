@@ -563,9 +563,9 @@ function screenDistributorPlayer(){
     const inv = loadState(); // fresh
     const next = inv.codes.find(c => c.status === "unused");
     if (!next){
-      alert("No codes available on this device.
+      alert(`No codes available on this device.
 
-For true live distribution across devices, a backend is needed.");
+For true live distribution across devices, a backend is needed.`);
       return;
     }
 
