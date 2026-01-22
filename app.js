@@ -155,7 +155,7 @@ function screenCommunity(){
       <div class="card accent pad" style="--accent: var(--gg-blue);">
         <div style="font-weight:900;font-size:16px;margin-bottom:6px;">Customize the Player Experience</div>
         <div class="small">
-          If set, players see your logo + this note before the code screen.
+          If set, players see your logo + this note alongside the code screen.
         </div>
         <div class="hr"></div>
         <textarea id="welcomeNote" class="textarea" placeholder="Thank players for coming...">${escapeHtml(state.community.welcomeNote)}</textarea>
@@ -294,7 +294,7 @@ function screenDistributor(){
   });
 
   view.querySelector('[data-act="settings"]').addEventListener("click", () => {
-    toast("Settings page can be added next (toggles, haptics, etc.).");
+    location.hash = "#/distributor/settings";
   });
 
   view.querySelector("#btnAdd").addEventListener("click", () => {
@@ -467,7 +467,7 @@ function screenDistributorPlayer(){
               </div>
 
               <button class="btn green wide" id="btnRedeem" style="margin-top:12px;">
-                <span class="ico">🛒</span> Redeem at Web Store
+                <span class="ico emoji-pill">🛒</span> Redeem at Web Store
               </button>
 
               <div class="hr"></div>
@@ -480,7 +480,7 @@ function screenDistributorPlayer(){
               </div>
 
               <div style="height:10px;"></div>
-              <button class="btn wide" id="btnFlag"><span class="ico">🚩</span> Report an Issue</button>
+              <button class="btn wide" id="btnFlag"><span class="ico emoji-pill">🚩</span> Report an Issue</button>
             </div>
           </div>
         </div>
@@ -509,12 +509,34 @@ function screenDistributorPlayer(){
     if (!next) return toast("No codes available.");
     const url = `https://store.pokemongo.com/offer-redemption?passcode=${encodeURIComponent(next.codeText)}`;
     window.open(url, "_blank", "noopener,noreferrer");
+    const settings = getState().distributorSettings || {};
+    if (settings.haptics && navigator.vibrate) navigator.vibrate(25);
+    if (settings.dailyCooldown) {
+      const todayKey = `ggtools:dist:claimed:${new Date().toISOString().slice(0,10)}`;
+      localStorage.setItem(todayKey, "1");
+    }
+    if (settings.sessionCapEnabled && Number(settings.sessionCap || 0) > 0) {
+      const capKey = "ggtools:dist:sessionClaimed";
+      const claimed = Number(localStorage.getItem(capKey) || "0");
+      localStorage.setItem(capKey, String(claimed + 1));
+    }
   });
 
   view.querySelector("#btnCampfire")?.addEventListener("click", () => {
     const url = state.community.campfireUrl?.trim();
     if (!url) return toast("No Campfire URL set.");
     window.open(url, "_blank", "noopener,noreferrer");
+    const settings = getState().distributorSettings || {};
+    if (settings.haptics && navigator.vibrate) navigator.vibrate(25);
+    if (settings.dailyCooldown) {
+      const todayKey = `ggtools:dist:claimed:${new Date().toISOString().slice(0,10)}`;
+      localStorage.setItem(todayKey, "1");
+    }
+    if (settings.sessionCapEnabled && Number(settings.sessionCap || 0) > 0) {
+      const capKey = "ggtools:dist:sessionClaimed";
+      const claimed = Number(localStorage.getItem(capKey) || "0");
+      localStorage.setItem(capKey, String(claimed + 1));
+    }
   });
 
   view.querySelector("#btnFlag")?.addEventListener("click", () => {
@@ -524,6 +546,91 @@ function screenDistributorPlayer(){
       "If the Web Store says your code is invalid or you do not qualify, your account may be on cooldown.\n\n" +
       "Please reach out to a Community Ambassador for assistance."
     );
+  });
+}
+
+
+function screenDistributorSettings() {
+  const state = getState();
+  const s = state.distributorSettings || {};
+  const view = el(`
+    <div class="shell">
+      ${topbar({ title: "Distributor Settings", back: "#/distributor", tone: "distributor" })}
+      <div class="content">
+        <div class="panel">
+          <div class="panel-title">Behavior</div>
+
+          <label class="row">
+            <div class="row-main">
+              <div class="row-title">Haptics</div>
+              <div class="row-sub">Vibrate lightly on key actions (supported devices only).</div>
+            </div>
+            <input id="setHaptics" type="checkbox" ${s.haptics ? "checked" : ""} />
+          </label>
+
+          <label class="row">
+            <div class="row-main">
+              <div class="row-title">Test Mode</div>
+              <div class="row-sub">Generates fake codes so you can demo without real inventory.</div>
+            </div>
+            <input id="setTestMode" type="checkbox" ${s.testMode ? "checked" : ""} />
+          </label>
+
+          <label class="row">
+            <div class="row-main">
+              <div class="row-title">Daily Cooldown</div>
+              <div class="row-sub">Limit each device to 1 code per day (local-only).</div>
+            </div>
+            <input id="setCooldown" type="checkbox" ${s.dailyCooldown ? "checked" : ""} />
+          </label>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Session Cap</div>
+
+          <label class="row">
+            <div class="row-main">
+              <div class="row-title">Enable Cap</div>
+              <div class="row-sub">Stop dispensing after X successful claims.</div>
+            </div>
+            <input id="setCapEnabled" type="checkbox" ${s.sessionCapEnabled ? "checked" : ""} />
+          </label>
+
+          <div class="row" style="align-items:center; gap:12px;">
+            <div class="row-main">
+              <div class="row-title">Max Claims</div>
+              <div class="row-sub">Set to 0 to disable.</div>
+            </div>
+            <input id="setCap" class="input" inputmode="numeric" pattern="[0-9]*" style="width:120px;" value="${Number(s.sessionCap || 0)}" />
+          </div>
+        </div>
+
+        <button id="btnSave" class="btn primary distributor" style="width:100%;">💾 Save</button>
+
+        <div class="hint" style="margin-top:12px;">
+          Notes:
+          <ul>
+            <li>Cooldown + cap are enforced in the <b>Player Screen</b> (the page players open).</li>
+            <li>Everything here is stored locally in your browser (GitHub Pages has no server).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  `);
+
+  mount(view);
+
+  view.querySelector("#btnSave").addEventListener("click", () => {
+    const next = {
+      haptics: !!view.querySelector("#setHaptics").checked,
+      testMode: !!view.querySelector("#setTestMode").checked,
+      dailyCooldown: !!view.querySelector("#setCooldown").checked,
+      sessionCapEnabled: !!view.querySelector("#setCapEnabled").checked,
+      sessionCap: Math.max(0, parseInt(view.querySelector("#setCap").value || "0", 10) || 0)
+    };
+    setState({ distributorSettings: next });
+    toast("Saved.");
+    location.hash = "#/distributor";
   });
 }
 
@@ -754,6 +861,27 @@ function escapeHtml(s){
     .replaceAll('"',"&quot;")
     .replaceAll("'","&#039;");
 }
+
+function escapeAttr(s){
+  return (s ?? "").toString()
+    .replaceAll("&","&amp;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#39;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;");
+}
+function stripUrlsMultiline(s){
+  const lines = (s ?? "").toString().split(/\r?\n/);
+  const cleaned = lines.map(l => l.replace(/https?:\/\/\S+/g,"").trim()).filter(Boolean);
+  return cleaned.join("\n");
+}
+function wrapEmojis(s){
+  // Wrap most emoji glyphs in a subtle pill so they stay readable on colorful backgrounds.
+  // NOTE: This intentionally over-matches some symbols; visually it's fine.
+  return (s ?? "").toString().replace(/([\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}])/gu, '<span class="emoji-pill">$1</span>');
+}
+
+
 
 function fileToDataURL(file){
   return new Promise((resolve, reject) => {
