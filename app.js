@@ -42,25 +42,30 @@ function screenHub(){
 
   const communityName = state.community.name?.trim() || "My Community";
 
+  const avatar = state.community.logoDataUrl
+    ? `<img src="${state.community.logoDataUrl}" alt="Logo" />`
+    : `<span class="ico" style="font-size:22px;opacity:0.85;">🌿</span>`;
+
   view.innerHTML = `
     <div class="col">
-      ${topbar({
-        title: "GG Meetup Tools",
-        subtitle: communityName,
-        onBack: null,
-        rightActions: [
-          { act: "openMenu", label: "Menu", icon: "≡" }
-        ]
-      })}
+      <div class="hub-header">
+        <div class="hub-brand">
+          <div class="brand-avatar">${avatar}</div>
+          <div class="brand-meta">
+            <h1 class="hub-title"><span class="accent-title">GG Meetup Tools</span></h1>
+            <div class="hub-sub"><span class="ico">👥</span> ${escapeHtml(communityName)}</div>
+          </div>
+        </div>
+</div>
 
-      <div class="card accent pad" style="--accent: var(--gg-blue);">
+      <div class="card accent pad" style="--accent: var(--gg-blue); cursor:pointer;" data-go="#/community">
         <div class="row space-between">
           <div class="row" style="gap:12px;">
             <div class="icon-tile" style="border-color: rgba(255,255,255,0.12);">
               <span class="ico">✨</span>
             </div>
             <div>
-              <div style="font-weight:800;font-size:18px;">Welcome, Ambassador!</div>
+              <div style="font-weight:900;font-size:18px;">Welcome, Ambassador!</div>
               <div class="small">Tap to set your Community Profile</div>
             </div>
           </div>
@@ -68,7 +73,10 @@ function screenHub(){
         </div>
       </div>
 
-      <div class="tool-card" data-go="#/distributor" style="border-color: color-mix(in srgb, var(--gg-orange) 40%, rgba(255,255,255,0.10)); box-shadow: 0 0 24px rgba(248,102,13,0.10), inset 0 1px 0 rgba(255,255,255,0.04);">
+      <div class="tool-card" data-go="#/distributor" style="
+        border-color: color-mix(in srgb, var(--gg-orange) 46%, rgba(255,255,255,0.10));
+        box-shadow: 0 0 26px rgba(248,102,13,0.10), inset 0 1px 0 rgba(255,255,255,0.04);
+      ">
         <div class="icon-tile"><span class="ico">⌁</span></div>
         <div class="meta">
           <p class="t">Code Distributor</p>
@@ -77,7 +85,10 @@ function screenHub(){
         <div class="chev">→</div>
       </div>
 
-      <div class="tool-card" data-go="#/raffle" style="border-color: color-mix(in srgb, var(--gg-blue) 40%, rgba(255,255,255,0.10)); box-shadow: 0 0 24px rgba(0,152,214,0.10), inset 0 1px 0 rgba(255,255,255,0.04);">
+      <div class="tool-card" data-go="#/raffle" style="
+        border-color: color-mix(in srgb, var(--gg-blue) 46%, rgba(255,255,255,0.10));
+        box-shadow: 0 0 26px rgba(0,152,214,0.10), inset 0 1px 0 rgba(255,255,255,0.04);
+      ">
         <div class="icon-tile"><span class="ico">🏆</span></div>
         <div class="meta">
           <p class="t">Raffle Master</p>
@@ -86,7 +97,7 @@ function screenHub(){
         <div class="chev">→</div>
       </div>
 
-      <div class="tool-card locked">
+      <div class="tool-card locked" aria-disabled="true">
         <div class="icon-tile"><span class="ico">🧠</span></div>
         <div class="meta">
           <p class="t">Trivia Master</p>
@@ -102,7 +113,6 @@ function screenHub(){
   `;
 
   bindCommon();
-  view.querySelector(".card.accent")?.addEventListener("click", () => nav("#/community"));
 }
 
 function screenCommunity(){
@@ -541,6 +551,7 @@ function screenRaffleStub(){
 }
 
 function route(){
+  state = loadState();
   const h = location.hash || "#/hub";
   const path = h.replace(/^#/, "");
 
@@ -555,17 +566,163 @@ function route(){
 }
 
 window.addEventListener("hashchange", route);
+window.addEventListener("storage", (e) => {
+  if (e.key && e.key.startsWith("gg-tools-sandbox")) {
+    state = loadState();
+    route();
+  }
+});
 route();
+
+/* =========================
+   Menu modal (real)
+   ========================= */
+const menuModal = document.createElement("div");
+menuModal.className = "modal";
+menuModal.innerHTML = `
+  <div class="backdrop" data-act="closeMenu"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Menu">
+    <div class="handle"></div>
+    <div class="content">
+      <h3>Menu</h3>
+      <div class="menu-list">
+        <div class="menu-item" data-act="menuAbout">
+          <div class="left">
+            <div class="icon-tile" style="width:42px;height:42px;border-radius:14px;"><span class="ico">ℹ️</span></div>
+            <div style="min-width:0;">
+              <div class="label">About</div>
+              <div class="desc">What this sandbox is + quick tips</div>
+            </div>
+          </div>
+          <div class="chev">→</div>
+        </div>
+
+        <div class="menu-item" data-act="menuExport">
+          <div class="left">
+            <div class="icon-tile" style="width:42px;height:42px;border-radius:14px;"><span class="ico">⬇️</span></div>
+            <div style="min-width:0;">
+              <div class="label">Export Data (JSON)</div>
+              <div class="desc">Backup local sandbox state</div>
+            </div>
+          </div>
+          <div class="chev">→</div>
+        </div>
+
+        <div class="menu-item" data-act="menuImport">
+          <div class="left">
+            <div class="icon-tile" style="width:42px;height:42px;border-radius:14px;"><span class="ico">⬆️</span></div>
+            <div style="min-width:0;">
+              <div class="label">Import Data (JSON)</div>
+              <div class="desc">Restore a previous backup</div>
+            </div>
+          </div>
+          <div class="chev">→</div>
+        </div>
+
+        <div class="menu-item" data-act="menuReset" style="border-color: rgba(248,102,13,0.35);">
+          <div class="left">
+            <div class="icon-tile" style="width:42px;height:42px;border-radius:14px;border-color: rgba(248,102,13,0.35);"><span class="ico">🧨</span></div>
+            <div style="min-width:0;">
+              <div class="label">Reset Sandbox</div>
+              <div class="desc">Clears localStorage for this site</div>
+            </div>
+          </div>
+          <div class="chev">→</div>
+        </div>
+
+        <button class="btn wide" data-act="closeMenu"><span class="ico">✕</span> Close</button>
+      </div>
+      <input id="menuImportFile" type="file" accept="application/json" style="display:none;" />
+    </div>
+  </div>
+`;
+document.body.appendChild(menuModal);
+
+function openMenu(){
+  menuModal.classList.add("open");
+}
+function closeMenu(){
+  menuModal.classList.remove("open");
+}
+
+menuModal.addEventListener("click", async (e) => {
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (!act) return;
+
+  if (act === "closeMenu"){
+    closeMenu();
+    return;
+  }
+
+  if (act === "menuAbout"){
+    closeMenu();
+    alert(
+      "GG Tools Sandbox\\n\\n" +
+      "• Vanilla HTML/CSS/JS (no framework)\\n" +
+      "• Data is stored locally in your browser (localStorage)\\n" +
+      "• Use Export/Import to backup state\\n\\n" +
+      "Tip: On iOS Safari, Share → Add to Home Screen for an app-like feel."
+    );
+    return;
+  }
+
+  if (act === "menuExport"){
+    // Lazy import to avoid circular deps here
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "gg-tools-sandbox-backup.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast("Exported.");
+    return;
+  }
+
+  if (act === "menuImport"){
+    document.getElementById("menuImportFile").click();
+    return;
+  }
+
+  if (act === "menuReset"){
+    closeMenu();
+    if (confirm("Reset sandbox data? This clears local settings and codes.")){
+      localStorage.clear();
+      state = loadState();
+      toast("Reset.");
+      route();
+    }
+    return;
+  }
+});
+
+document.getElementById("menuImportFile").addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try{
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    // basic merge safety
+    state = { ...loadState(), ...parsed };
+    saveState(state);
+    toast("Imported.");
+    closeMenu();
+    route();
+  }catch{
+    toast("Import failed (invalid JSON).");
+  }finally{
+    e.target.value = "";
+  }
+});
 
 function bindCommon(){
   view.querySelector('[data-act="back"]')?.addEventListener("click", () => history.back());
   view.querySelectorAll("[data-go]").forEach(el => {
     el.addEventListener("click", () => nav(el.getAttribute("data-go")));
   });
-  view.querySelector('[data-act="openMenu"]')?.addEventListener("click", () => {
-    toast("Menu stub (add About / Reset / Theme toggles here).");
-  });
-}
+  }
 
 function toast(msg){
   const t = document.createElement("div");
