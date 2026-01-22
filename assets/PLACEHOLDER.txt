@@ -1,0 +1,1 @@
+Put optional images here, e.g., bg-wave.png and logo.png
