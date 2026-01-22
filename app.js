@@ -1,6 +1,11 @@
 import { loadState, saveState, addCodes, counts, deleteCode, updateCodeText } from "./store.js";
 import { downloadText, formatLocal, parseCodesFromText, shareText } from "./utils.js";
 
+// --- Derived selectors (avoid stale function names) ---
+const getUnusedCount = (state) => counts(state).unused;
+const getRedeemedCount = (state) => counts(state).redeemed;
+
+
 const view = document.getElementById("view");
 let state = loadState();
 let routeQuery = new URLSearchParams();
@@ -195,8 +200,8 @@ function screenCommunity(){
 function screenDistributor(){
   setAccent("--gg-orange");
 
-  const unused = countUnused();
-  const redeemed = countRedeemed();
+  const unused = getUnusedCount();
+  const redeemed = getRedeemedCount();
   const active = Boolean(state.distributor.sessionActive && state.distributor.sessionId);
 
   view.innerHTML = `
@@ -312,7 +317,7 @@ function screenDistributor(){
   });
 
   view.querySelector('[data-act="startSession"]')?.addEventListener("click", ()=>{
-    const unusedNow = countUnused();
+    const unusedNow = getUnusedCount();
     if(unusedNow<=0) return toast("No unused codes available.");
     const raw = ($("#preCapInput")?.value || "").trim();
     let capManual = raw==="" ? null : parseInt(raw,10);
@@ -604,7 +609,7 @@ function screenDistributorSession(){
   const claimed = getSessionClaimed(sid);
   let cap = getSessionCap(sid);
   if(cap === null || cap === undefined){
-    cap = countUnused() + claimed;
+    cap = getUnusedCount() + claimed;
     setSessionCap(sid, cap);
   }
   const remaining = Math.max(0, cap - claimed);
@@ -1031,7 +1036,7 @@ function newSessionId(){
 }
 
 function startSession(cap){
-  const unusedNow = countUnused();
+  const unusedNow = getUnusedCount();
   if(unusedNow<=0) return toast("No unused codes available.");
   const sid = newSessionId();
   const safeCap = Math.max(0, Math.min(Number(cap)||unusedNow, unusedNow));
