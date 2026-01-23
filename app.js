@@ -78,10 +78,29 @@ function mountModal(innerHtml){
   return () => el.remove();
 }
 
+function toast(message){
+  let t = document.getElementById("toast");
+  if (!t){
+    t = document.createElement("div");
+    t.id = "toast";
+    document.body.appendChild(t);
+  }
+  t.textContent = message;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), 1600);
+}
+
 function screenHome(){
   const s = readState();
   const communityLabel = s.community.name ? s.community.name : "My Community";
-  const showWelcome = !(String(s.community.name||"").trim() || String(s.community.campfireUrl||"").trim() || String(s.community.logoDataUrl||"").trim());
+  const showWelcome = !(
+    String(s.community.name||"").trim() ||
+    String(s.community.campfireUrl||"").trim() ||
+    String(s.community.instagramUrl||"").trim() ||
+    String(s.community.note||"").trim() ||
+    String(s.community.logoDataUrl||"").trim()
+  );
 
   const tile = (id, icon, title, desc) => `
     <div class="card tile" data-goto="${id}">
@@ -110,12 +129,11 @@ function screenHome(){
       ${tile("distributor", Icons.bolt(), "Code Distributor", "Queue-based distribution for promo codes.")}
       ${tile("raffle", Icons.trophy(), "Raffle Master", "Pick random winners from a list.")}
       <div style="height:6px"></div>
-      <button class="pillBtn" id="btnCommunityBottom">${Icons.gear()} Community Settings</button>
     </div>
   `);
 
   // handlers
-  $("#btnCommunityBottom")?.addEventListener("click", () => goto("community"));
+  // Community Settings is accessible via the top-right gear; no redundant tile.
   $$("[data-goto]").forEach(el => el.addEventListener("click", () => goto(el.getAttribute("data-goto") || "")));
   $("[data-id='community']")?.addEventListener("click", () => goto("community"));
 }
@@ -441,10 +459,22 @@ function screenDistributorLive(){
   new QRCode(qrEl, { text: playerUrl, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
 
   $("#btnBack")?.addEventListener("click", () => goto("distributor"));
-  $("[data-id='share']")?.addEventListener("click", () => copyToClipboard(playerUrl));
+
+  const doCopy = async () => {
+    try{
+      await copyToClipboard(playerUrl);
+      toast("Link copied");
+    }catch{
+      // Fallback for browsers that block clipboard APIs
+      toast("Copy failed — showing link");
+      window.prompt("Copy this link", playerUrl);
+    }
+  };
+
+  $("[data-id='share']")?.addEventListener("click", doCopy);
   $("[data-id='editCap']")?.addEventListener("click", () => openEditSessionCap());
 
-  $("#btnCopyLink")?.addEventListener("click", () => copyToClipboard(playerUrl));
+  $("#btnCopyLink")?.addEventListener("click", doCopy);
   $("#btnFullscreen")?.addEventListener("click", async () => {
     const wrap = $(".qrWrap");
     if (!wrap) return;

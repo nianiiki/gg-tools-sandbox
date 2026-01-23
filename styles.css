@@ -197,6 +197,15 @@ textarea{min-height:92px; resize:vertical}
 }
 .smallBtn:active{transform:translateY(1px)}
 
+/* keep icon sizes consistent inside compact buttons */
+.smallBtn svg{width:18px; height:18px; display:block}
+.smallBtn{display:inline-flex; align-items:center; justify-content:center; gap:8px}
+
+/* Distributor session-cap edit control (pencil + label) */
+.btnEditDefaultCap{height:44px; padding: 0 12px; min-width: 96px; border-radius: 16px; gap:8px}
+.btnEditDefaultCap svg{width:16px; height:16px}
+.btnEditDefaultCap svg{width:16px; height:16px}
+
 .banner{
   border-radius: 20px;
   background: rgba(0,0,0,.12);
@@ -256,6 +265,26 @@ textarea{min-height:92px; resize:vertical}
   width:10px; height:10px; border-radius:99px; margin-top:6px;
   background: rgba(255,255,255,.55);
 }
+
+/* lightweight toast */
+#toast{
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,.70);
+  border: 1px solid rgba(255,255,255,.22);
+  color: rgba(255,255,255,.95);
+  padding: 10px 14px;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+  z-index: 1000;
+  font-weight: 700;
+}
+#toast.show{opacity: 1}
 
 @media (max-width:720px){
   .brand h1{font-size:24px}

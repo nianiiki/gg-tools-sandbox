@@ -25,8 +25,14 @@ function safeParse(raw){
 }
 
 function mergeDefaults(obj, defaults){
-  if (!obj || typeof obj !== "object") return structuredClone(defaults);
-  const out = structuredClone(defaults);
+  const clone = (v) => {
+    // structuredClone is not supported in some older/mobile browsers.
+    if (typeof structuredClone === "function") return structuredClone(v);
+    return JSON.parse(JSON.stringify(v));
+  };
+
+  if (!obj || typeof obj !== "object") return clone(defaults);
+  const out = clone(defaults);
   // shallow merge + nested merges we care about
   out.community = { ...defaults.community, ...(obj.community || {}) };
   out.codes = { ...defaults.codes, ...(obj.codes || {}) };
@@ -47,7 +53,11 @@ export function saveState(s){
 }
 
 export function resetAll(){
-  saveState(structuredClone(DEFAULT));
+  const clone = (v) => {
+    if (typeof structuredClone === "function") return structuredClone(v);
+    return JSON.parse(JSON.stringify(v));
+  };
+  saveState(clone(DEFAULT));
   return loadState();
 }
 
