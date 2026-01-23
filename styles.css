@@ -291,3 +291,59 @@ textarea{min-height:92px; resize:vertical}
   .grid2{grid-template-columns:1fr}
   .splitBar{grid-template-columns:1fr 1fr}
 }
+
+
+/* Settings toggles */
+.toggleRow{
+  display:flex;
+  gap:14px;
+  align-items:center;
+  padding: 10px 0;
+}
+.switch{
+  position:relative;
+  width:52px;
+  height:30px;
+  display:inline-block;
+}
+.switch input{display:none}
+.slider{
+  position:absolute; inset:0;
+  border-radius:999px;
+  background: rgba(0,0,0,.18);
+  border: 1px solid rgba(255,255,255,.22);
+  transition: all 160ms ease;
+  box-shadow: var(--shadowSoft);
+}
+.slider:before{
+  content:"";
+  position:absolute;
+  width:24px; height:24px;
+  left:3px; top:2px;
+  border-radius:999px;
+  background: rgba(255,255,255,.92);
+  transition: all 160ms ease;
+}
+.switch input:checked + .slider{
+  background: rgba(43,138,62,.65);
+  border-color: rgba(255,255,255,.26);
+}
+.switch input:checked + .slider:before{
+  transform: translateX(21px);
+}
+
+/* Claim page code box */
+.codeBox{
+  border-radius: 22px;
+  background: rgba(0,0,0,.14);
+  border: 1px solid rgba(255,255,255,.18);
+  padding: 14px;
+  text-align:center;
+}
+.codeText{
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: .18em;
+  margin-top: 6px;
+  word-break: break-word;
+}

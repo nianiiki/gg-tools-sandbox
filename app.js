@@ -2,8 +2,10 @@ import {
   loadState, saveState, resetAll,
   counts, addCodes, exportUnused,
   startSession, endSession, togglePause, setSessionCap,
-  setDefaultCap, computeDefaultSessionCap, claimOne
-} from "./store.js";
+  setDefaultCap, computeDefaultSessionCap,
+  claimOne, setDistributorSetting,
+  playerAlreadyClaimed, recordPlayerClaim, addReport
+} from "./store.MKXV.js";
 import { uid, copyToClipboard, downloadText, escapeHtml } from "./utils.js";
 
 /** tiny DOM helpers (we intentionally do NOT use jQuery) **/
@@ -30,6 +32,9 @@ const Icons = {
   pause: () => `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>`,
   stop: () => `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>`,
   link: () => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.1 0l1.4-1.4a5 5 0 0 0-7.1-7.1L10 4.9"/><path d="M14 11a5 5 0 0 0-7.1 0L5.5 12.4a5 5 0 0 0 7.1 7.1L14 19.1"/></svg>`,
+
+  external: () => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 14v7H3V3h7"/></svg>`,
+  flag: () => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22V3"/><path d="M4 4h12l-1 5 5 2-2 6H4"/></svg>`,
   pencil: () => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>`,
   upload: () => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>`,
   download: () => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>`
@@ -242,7 +247,7 @@ function screenDistributor(){
             <div class="title">Session</div>
             <div class="muted">${escapeHtml(capLabel)}</div>
           </div>
-          <button class="smallBtn" id="btnEditDefaultCap">${Icons.pencil()} Edit</button>
+          <button class="smallBtn btnEditDefaultCap" id="btnEditDefaultCap">${Icons.pencil()} Edit</button>
         </div>
         <div style="height:12px"></div>
         ${sessionActive
@@ -369,6 +374,21 @@ function screenDistributor(){
 function screenDistributorSettings(){
   const st = readState();
   const capLabel = st.distributor.defaultCap ? st.distributor.defaultCap : "";
+  const cfg = st.distributor.settings || {};
+
+  const toggle = (id, label, desc, checked) => `
+    <div class="toggleRow">
+      <div class="grow" style="min-width:0">
+        <div class="title" style="font-size:16px">${escapeHtml(label)}</div>
+        <div class="muted">${escapeHtml(desc)}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="${escapeHtml(id)}" ${checked ? "checked" : ""}>
+        <span class="slider"></span>
+      </label>
+    </div>
+  `;
+
   mount(`
     ${header({ title: "Distributor Settings", subtitle: "Queue configuration & controls", onBack: () => goto("distributor") })}
     <div class="stack">
@@ -378,23 +398,51 @@ function screenDistributorSettings(){
           <input class="input" id="defaultCap" inputmode="numeric" placeholder="Unlimited" value="${escapeHtml(capLabel)}">
           <div class="muted">Leave empty or 0 for unlimited (defaults to full unused inventory at session start).</div>
         </div>
+
         <div style="height:14px"></div>
+        <div class="hr"></div>
+        <div style="height:14px"></div>
+
+        ${toggle("tRemoveDaily", "Remove Daily Limit", "If enabled, players can claim once per session (instead of once per day).", !!cfg.removeDailyLimit)}
+        ${toggle("tIncognito", "Block Incognito", "If enabled, attempt to warn players using private browsing (best-effort).", !!cfg.blockIncognito)}
+        ${toggle("tTestMode", "Test Mode", "Serve fake TEST-XXXXXX codes (does not consume inventory).", !!cfg.testMode)}
+        ${toggle("tHaptics", "Haptic Vibration", "Vibrate on successful claim (mobile, if supported).", cfg.haptics !== false)}
+
+        <div style="height:14px"></div>
+
         <div class="banner">
-          <div class="title" style="font-size:16px">⚠️ PoGO Limit Warning</div>
-          <div class="muted">PoGO often restricts accounts to 1 code per week. If the Web Store says “code is invalid” or “you do not qualify”, the code may still be valid — your account could be on cooldown.</div>
+          <div class="row" style="gap:10px;align-items:flex-start">
+            <div class="badge" style="width:40px;height:40px;border-radius:16px">${Icons.trophy()}</div>
+            <div class="grow">
+              <div class="title" style="font-size:16px">PoGO Limit Warning</div>
+              <div class="muted">Pokémon GO Web Store often restricts accounts to 1 code per week. If you see “invalid” or “not eligible”, the code may still be valid — your account could be on cooldown.</div>
+            </div>
+          </div>
         </div>
+
+        <div style="height:12px"></div>
+
+        <button class="pillBtn" id="btnMetrics">${Icons.people()} Community Metrics</button>
       </div></div>
+
       <button class="pillBtn primary" id="btnSave">Save & Back</button>
     </div>
   `);
 
   $("#btnBack")?.addEventListener("click", () => goto("distributor"));
+  $("#btnMetrics")?.addEventListener("click", () => toast("Community Metrics: coming soon"));
+
   $("#btnSave")?.addEventListener("click", () => {
     let s2 = setDefaultCap(readState(), $("#defaultCap").value);
+    s2 = setDistributorSetting(s2, "removeDailyLimit", $("#tRemoveDaily").checked);
+    s2 = setDistributorSetting(s2, "blockIncognito", $("#tIncognito").checked);
+    s2 = setDistributorSetting(s2, "testMode", $("#tTestMode").checked);
+    s2 = setDistributorSetting(s2, "haptics", $("#tHaptics").checked);
     writeState(s2);
     goto("distributor");
   });
 }
+
 
 function screenDistributorLive(){
   const st = readState();
@@ -412,7 +460,6 @@ function screenDistributorLive(){
       subtitle: "LIVE",
       onBack: () => goto("distributor"),
       rightButtons: [
-        { id: "share", label: "Copy link", icon: Icons.link() },
         { id: "editCap", label: "Edit session cap", icon: Icons.pencil() }
       ]
     })}
@@ -421,9 +468,11 @@ function screenDistributorLive(){
         <div class="qrWrap">
           <div id="qrcode" style="width:220px;height:220px"></div>
           <h2>Scan to Claim</h2>
+          <div class="muted" style="color:rgba(10,10,10,.65)">Waiting for scans…</div>
           <div class="qrTools">
             <button class="smallBtn" id="btnFullscreen">Fullscreen</button>
             <button class="smallBtn" id="btnCopyLink">${Icons.link()} Copy Link</button>
+            <button class="smallBtn" id="btnOpenClaim">${Icons.external()} Open</button>
           </div>
         </div>
       </div></div>
@@ -445,6 +494,8 @@ function screenDistributorLive(){
 
       <div class="row">
         <button class="pillBtn" id="btnPause">${isPaused ? Icons.play() : Icons.pause()} ${isPaused ? "Resume" : "Pause"}</button>
+        <button class="smallBtn" id="btnPrint" title="Print QR + link">Print</button>
+        <button class="smallBtn" id="btnNfc" title="Write session link to NFC tag (if supported)">NFC</button>
         <button class="smallBtn" id="btnSimClaim" title="Simulate a player claim (for testing)">+1</button>
       </div>
 
@@ -475,12 +526,31 @@ function screenDistributorLive(){
   $("[data-id='editCap']")?.addEventListener("click", () => openEditSessionCap());
 
   $("#btnCopyLink")?.addEventListener("click", doCopy);
+  $("#btnOpenClaim")?.addEventListener("click", () => window.open(playerUrl, "_blank"));
   $("#btnFullscreen")?.addEventListener("click", async () => {
     const wrap = $(".qrWrap");
     if (!wrap) return;
     try{
       await wrap.requestFullscreen();
     }catch{}
+  });
+
+  $("#btnPrint")?.addEventListener("click", () => window.print());
+
+  $("#btnNfc")?.addEventListener("click", async () => {
+    // Best-effort NFC write (Chrome/Android)
+    if (!("NDEFReader" in window)){
+      toast("NFC not supported on this device");
+      return;
+    }
+    try{
+      // eslint-disable-next-line no-undef
+      const ndef = new NDEFReader();
+      await ndef.write({ records: [{ recordType: "url", data: playerUrl }] });
+      toast("NFC written");
+    }catch{
+      toast("NFC write canceled");
+    }
   });
 
   $("#btnPause")?.addEventListener("click", () => {
@@ -535,116 +605,237 @@ function screenDistributorLive(){
 }
 
 function screenClaim(sessionId){
-  const st = readState();
+  const st0 = readState();
 
   // Build campfire button (no long URL visible)
-  const campfireUrl = (st.community.campfireUrl || "").trim();
+  const campfireUrl = (st0.community.campfireUrl || "").trim();
   const hasCampfire = !!campfireUrl;
 
+  const cfg = st0.distributor.settings || {};
+  const sid = String(sessionId || "");
+
+  const openCampfire = () => {
+    if (hasCampfire) window.open(campfireUrl, "_blank");
+  };
+
+  const showEnded = (subtitleText) => {
+    const s = readState();
+    mount(`
+      ${header({ title: "Code Claim", subtitle: subtitleText, onBack: null })}
+      <div class="stack">
+        <div class="card"><div class="cardInner">
+          <div class="title">Session Ended</div>
+          <div class="muted">There isn't an active code session right now, or all codes allotted for this session have been claimed.</div>
+        </div></div>
+        ${hasCampfire ? `<button class="pillBtn primary" id="btnCampfire">${Icons.people()} Campfire Group</button>` : ""}
+      </div>
+    `);
+    $("#btnCampfire")?.addEventListener("click", openCampfire);
+  };
+
   // Validate session
-  if (!st.distributor.sessionActive || st.distributor.sessionId !== sessionId){
-    mount(`
-      ${header({ title: "Code Claim", subtitle: st.community.name || "Garden Grove PoGo", onBack: null })}
-      <div class="stack">
-        <div class="card"><div class="cardInner">
-          <div class="title">Session Ended</div>
-          <div class="muted">There isn't an active code session right now. Please check back later.</div>
-        </div></div>
-        ${hasCampfire ? `<button class="pillBtn primary" id="btnCampfire">${Icons.people()} GGPG Campfire Group</button>` : ""}
-      </div>
-    `);
-    $("#btnCampfire")?.addEventListener("click", () => window.open(campfireUrl, "_blank"));
+  if (!st0.distributor.sessionActive || st0.distributor.sessionId !== sid){
+    showEnded(st0.community.name || "My Community");
     return;
   }
 
-  // Attempt claim
-  let result = claimOne(st);
-  writeState(result.state);
-
-  const s2 = result.state;
-  const ended = !result.ok && (result.reason === "cap");
-  const paused = !result.ok && (result.reason === "paused");
-
-  if (ended){
-    mount(`
-      ${header({ title: "Code Claim", subtitle: s2.community.name || "Garden Grove PoGo", onBack: null })}
-      <div class="stack">
-        <div class="card"><div class="cardInner">
-          <div class="title">Session Ended</div>
-          <div class="muted">All codes allotted for this session have been claimed. Please check back later.</div>
-        </div></div>
-        ${hasCampfire ? `<button class="pillBtn primary" id="btnCampfire">${Icons.people()} GGPG Campfire Group</button>` : ""}
-      </div>
-    `);
-    $("#btnCampfire")?.addEventListener("click", () => window.open(campfireUrl, "_blank"));
+  // If cap reached, treat as ended for players
+  if (st0.distributor.sessionEnded || st0.distributor.claimed >= st0.distributor.sessionCap){
+    showEnded(st0.community.name || "My Community");
     return;
   }
 
-  if (paused){
+  // Best-effort incognito warning
+  const incognitoWarn = !!cfg.blockIncognito;
+
+  // Enforce "1 Code Only"
+  const already = playerAlreadyClaimed(st0, sid);
+  if (already.already){
+    const reason = already.reason === "day" ? "You can only claim 1 code per day." : "You can only claim 1 code per session.";
     mount(`
-      ${header({ title: "Code Claim", subtitle: s2.community.name || "Garden Grove PoGo", onBack: null })}
+      ${header({ title: "Code Claim", subtitle: st0.community.name || "My Community", onBack: null })}
+      <div class="stack">
+        <div class="card"><div class="cardInner">
+          <div class="title">1 Code Only</div>
+          <div class="muted">${escapeHtml(reason)}</div>
+          <div style="height:12px"></div>
+          <div class="banner">
+            <div class="muted">If you think this is a mistake, ask an Ambassador for help.</div>
+          </div>
+        </div></div>
+        ${hasCampfire ? `<button class="pillBtn primary" id="btnCampfire">${Icons.people()} Campfire Group</button>` : ""}
+      </div>
+    `);
+    $("#btnCampfire")?.addEventListener("click", openCampfire);
+    return;
+  }
+
+  // Paused?
+  if (st0.distributor.isPaused){
+    mount(`
+      ${header({ title: "Code Claim", subtitle: st0.community.name || "My Community", onBack: null })}
       <div class="stack">
         <div class="card"><div class="cardInner">
           <div class="title">Temporarily Paused</div>
           <div class="muted">Please wait a moment and try scanning again.</div>
         </div></div>
-        ${hasCampfire ? `<button class="pillBtn primary" id="btnCampfire">${Icons.people()} GGPG Campfire Group</button>` : ""}
+        ${hasCampfire ? `<button class="pillBtn primary" id="btnCampfire">${Icons.people()} Campfire Group</button>` : ""}
       </div>
     `);
-    $("#btnCampfire")?.addEventListener("click", () => window.open(campfireUrl, "_blank"));
+    $("#btnCampfire")?.addEventListener("click", openCampfire);
     return;
   }
 
-  // Success (front-end placeholder code)
-  const blurb = "🥳 Thanks for coming out, Trainer! If you’re not already in our Campfire community, join us for future meetups, raids, and event updates.";
-  mount(`
-    ${header({ title: "Code Claim", subtitle: s2.community.name || "Garden Grove PoGo", onBack: null })}
-    <div class="stack">
-      <div class="card"><div class="cardInner">
-        <div class="row" style="justify-content:center">
-          <div class="badge" style="width:74px;height:74px;border-radius:26px;background:rgba(255,255,255,.14)">
-            ${s2.community.logoDataUrl ? `<img alt="logo" src="${s2.community.logoDataUrl}" style="width:100%;height:100%;object-fit:cover">` : Icons.people()}
+  const subtitle = st0.community.name || "My Community";
+
+  const renderReveal = () => {
+    const st = readState();
+    const remaining = Math.max(0, st.distributor.sessionCap - st.distributor.claimed);
+    mount(`
+      ${header({ title: "Code Claim", subtitle, onBack: null })}
+      <div class="stack">
+        <div class="card"><div class="cardInner">
+          <div class="row" style="justify-content:center">
+            <div class="badge" style="width:74px;height:74px;border-radius:26px;background:rgba(255,255,255,.14)">
+              ${st.community.logoDataUrl ? `<img alt="logo" src="${st.community.logoDataUrl}" style="width:100%;height:100%;object-fit:cover">` : Icons.people()}
+            </div>
           </div>
-        </div>
-        <div style="height:12px"></div>
-        <div class="banner">
-          <div class="title" style="text-align:center">Welcome!</div>
-          <div class="muted" style="text-align:center">${escapeHtml(blurb)}</div>
-          ${hasCampfire ? `<div style="height:12px"></div><button class="pillBtn primary" id="btnCampfire">${Icons.people()} GGPG Campfire Group</button>` : ""}
-        </div>
+          <div style="height:12px"></div>
+          <div class="title" style="text-align:center">Reveal Reward</div>
+          <div class="muted" style="text-align:center">Tap below to unlock your promo code.</div>
 
-        <div style="height:14px"></div>
+          ${incognitoWarn ? `
+            <div style="height:14px"></div>
+            <div class="banner">
+              <div class="title" style="font-size:16px">Private Browsing Notice</div>
+              <div class="muted">If you're using Incognito/Private mode, your claim may not “stick”. For best results, use a normal browser tab.</div>
+            </div>
+          ` : ""}
 
-        <div class="banner">
-          <div class="title" style="text-align:center">Code Unlocked!</div>
+          <div style="height:14px"></div>
+          <button class="pillBtn primary" id="btnReveal">${Icons.bolt()} Reveal Reward</button>
           <div style="height:10px"></div>
-          <div class="qrWrap" style="background:rgba(0,0,0,.18);color:rgba(255,255,255,.95);border:1px solid rgba(255,255,255,.18)">
-            <div class="kicker">CODE</div>
-            <div style="font-size:22px;font-weight:850;letter-spacing:.2em">CODE</div>
-          </div>
-          <div style="height:12px"></div>
-          <div class="row">
-            <button class="pillBtn" id="btnCopy">Copy</button>
-            <button class="pillBtn" id="btnShare">Share</button>
-          </div>
-          <div style="height:12px"></div>
-          <button class="pillBtn primary" id="btnRedeem">Redeem at Web Store</button>
-        </div>
-      </div></div>
-    </div>
-  `);
+          <div class="muted" style="text-align:center">Remaining in this session: <b>${remaining}</b></div>
+        </div></div>
 
-  $("#btnCampfire")?.addEventListener("click", () => window.open(campfireUrl, "_blank"));
-  $("#btnCopy")?.addEventListener("click", () => copyToClipboard("CODE"));
-  $("#btnShare")?.addEventListener("click", async () => {
-    if (navigator.share){
-      try{ await navigator.share({ text: "CODE" }); }catch{}
-    }else{
-      copyToClipboard("CODE");
-    }
-  });
-  $("#btnRedeem")?.addEventListener("click", () => window.open("https://store.pokemongolive.com/", "_blank"));
+        ${hasCampfire ? `<button class="pillBtn" id="btnCampfire">${Icons.people()} Campfire Group</button>` : ""}
+      </div>
+    `);
+
+    $("#btnCampfire")?.addEventListener("click", openCampfire);
+    $("#btnReveal")?.addEventListener("click", () => {
+      // Perform claim at reveal moment
+      const stA = readState();
+
+      // Re-check constraints at click time
+      const already2 = playerAlreadyClaimed(stA, sid);
+      if (already2.already){
+        screenClaim(sid);
+        return;
+      }
+      if (!stA.distributor.sessionActive || stA.distributor.sessionId !== sid) { showEnded(subtitle); return; }
+      if (stA.distributor.sessionEnded || stA.distributor.claimed >= stA.distributor.sessionCap) { showEnded(subtitle); return; }
+      if (stA.distributor.isPaused) { screenClaim(sid); return; }
+
+      const result = claimOne(stA);
+      let stB = result.state;
+
+      if (!result.ok){
+        writeState(stB);
+        if (result.reason === "cap" || result.reason === "empty") showEnded(subtitle);
+        else screenClaim(sid);
+        return;
+      }
+
+      // record local claim for "1 Code Only"
+      stB = recordPlayerClaim(stB, sid, result.code);
+      writeState(stB);
+
+      if (cfg.haptics !== false && navigator.vibrate) navigator.vibrate(30);
+
+      renderUnlocked(result.code);
+    });
+  };
+
+  const renderUnlocked = (code) => {
+    const st = readState();
+    mount(`
+      ${header({ title: "Code Claim", subtitle, onBack: null })}
+      <div class="stack">
+        <div class="card"><div class="cardInner">
+          <div class="banner">
+            <div class="title" style="text-align:center">Code Unlocked</div>
+            <div style="height:10px"></div>
+            <div class="codeBox">
+              <div class="kicker">CODE</div>
+              <div class="codeText">${escapeHtml(code)}</div>
+            </div>
+
+            <div style="height:12px"></div>
+
+            <button class="pillBtn primary" id="btnRedeem">Redeem at Web Store</button>
+
+            <div style="height:12px"></div>
+
+            <div class="row">
+              <button class="pillBtn" id="btnCopy">Copy Code</button>
+              <button class="pillBtn" id="btnShare">Share Code</button>
+            </div>
+
+            <div style="height:12px"></div>
+
+            <button class="pillBtn danger" id="btnReport">${Icons.flag()} Report issue</button>
+          </div>
+        </div></div>
+
+        ${hasCampfire ? `<button class="pillBtn" id="btnCampfire">${Icons.people()} Campfire Group</button>` : ""}
+      </div>
+    `);
+
+    $("#btnCampfire")?.addEventListener("click", openCampfire);
+
+    $("#btnRedeem")?.addEventListener("click", () => window.open("https://store.pokemongolive.com/", "_blank"));
+
+    $("#btnCopy")?.addEventListener("click", async () => {
+      try { await copyToClipboard(code); toast("Copied"); }
+      catch { window.prompt("Copy this code", code); }
+    });
+
+    $("#btnShare")?.addEventListener("click", async () => {
+      if (navigator.share){
+        try { await navigator.share({ text: code }); toast("Shared"); }
+        catch {}
+      }else{
+        try { await copyToClipboard(code); toast("Copied"); }
+        catch { window.prompt("Copy this code", code); }
+      }
+    });
+
+    $("#btnReport")?.addEventListener("click", () => {
+      const close = mountModal(`
+        <div class="title">Report an issue</div>
+        <div class="muted">Tell us what went wrong (ex: “Web Store says not eligible”).</div>
+        <div style="height:12px"></div>
+        <textarea id="reportMsg" placeholder="What happened?"></textarea>
+        <div style="height:16px"></div>
+        <div class="modalActions">
+          <button class="pillBtn" id="btnCancel">Cancel</button>
+          <button class="pillBtn danger" id="btnSend">Send</button>
+        </div>
+      `);
+      $("#btnCancel")?.addEventListener("click", close);
+      $("#btnSend")?.addEventListener("click", () => {
+        let st2 = addReport(readState(), { sessionId: sid, code, message: $("#reportMsg").value });
+        writeState(st2);
+        close();
+        toast("Reported. Thank you!");
+      });
+    });
+  };
+
+  renderReveal();
 }
+
 
 function screenRaffle(){
   mount(`

@@ -1,23 +1,29 @@
-# GG Tools Sandbox (Vanilla)
+# GG Meetup Tools (GG Tools Sandbox)
 
-This is a vanilla HTML/CSS/JS sandbox (no framework) with a dark-glass UI themed using Garden Grove colors.
+**Current version:** MKXIV
 
-## Files
-- index.html
-- styles.css
-- app.js
-- store.js
-- utils.js
-- assets/ (optional images like bg-wave.png)
+Vanilla HTML/CSS/JS tools for meetup ambassadors (GitHub Pages friendly).
 
-## Run locally
-If you have Python installed:
+## Local dev
+
+Open `index.html` directly, or run a simple server:
 
 ```bash
-python3 -m http.server 5173
+python -m http.server 8000
 ```
 
-Then open http://localhost:5173
+Then visit `http://localhost:8000`.
 
-## iOS/iPadOS
-Once hosted (e.g., GitHub Pages), open in Safari and use Share → Add to Home Screen.
+## Routes
+
+- `#/` Home
+- `#/community` Community Profile
+- `#/distributor` Distributor dashboard
+- `#/distributor/settings` Distributor settings
+- `#/distributor/live` Live session host screen (QR)
+- `#/claim/<sessionId>` Player claim flow (scan QR)
+
+## Notes
+
+- Storage is local-only via `localStorage` (no backend yet).
+- “Test Mode” serves fake `TEST-XXXXXX` codes and does not consume inventory.
