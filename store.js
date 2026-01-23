@@ -1,93 +1,157 @@
-import { nowISO } from "./utils.js";
+const KEY = "gg-tools-sandbox:v3";
 
-const KEY = "gg-tools-sandbox:v1";
-
-const defaultState = {
+const DEFAULT = {
   community: {
     name: "",
     campfireUrl: "",
-    logoDataUrl: "",   // optional base64
-    welcomeNote: ""    // message shown alongside the code
+    logoDataUrl: ""
+  },
+  codes: {
+    unused: [],
+    redeemed: []
   },
   distributor: {
-    // Legacy/global pause flag (kept for backward compatibility)
-    isPaused: true,
-
-    // Current live session (front-end-only prototype)
+    defaultCap: "",       // "" means "use full unused inventory"
+    sessionActive: false,
     sessionId: "",
-    sessionActive: false
-  },
-  codes: [] // { id, codeText, status: "unused"|"claimed", uploadedAt, claimedAt? }
+    sessionCap: 0,
+    claimed: 0,
+    isPaused: false
+  }
 };
 
-function uid(){
-  return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
+function safeParse(raw){
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+function mergeDefaults(obj, defaults){
+  if (!obj || typeof obj !== "object") return structuredClone(defaults);
+  const out = structuredClone(defaults);
+  // shallow merge + nested merges we care about
+  out.community = { ...defaults.community, ...(obj.community || {}) };
+  out.codes = { ...defaults.codes, ...(obj.codes || {}) };
+  out.codes.unused = Array.isArray(out.codes.unused) ? out.codes.unused : [];
+  out.codes.redeemed = Array.isArray(out.codes.redeemed) ? out.codes.redeemed : [];
+  out.distributor = { ...defaults.distributor, ...(obj.distributor || {}) };
+  return out;
 }
 
 export function loadState(){
-  try{
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return structuredClone(defaultState);
-    const parsed = JSON.parse(raw) || {};
+  const raw = localStorage.getItem(KEY);
+  const parsed = safeParse(raw);
+  return mergeDefaults(parsed, DEFAULT);
+}
 
-    // Deep-ish merge so nested defaults survive older saves.
-    return {
-      ...structuredClone(defaultState),
-      ...parsed,
-      community: {
-        ...structuredClone(defaultState.community),
-        ...(parsed.community || {})
-      },
-      distributor: {
-        ...structuredClone(defaultState.distributor),
-        ...(parsed.distributor || {})
-      }
-    };
-  }catch{
-    return structuredClone(defaultState);
+export function saveState(s){
+  localStorage.setItem(KEY, JSON.stringify(s));
+}
+
+export function resetAll(){
+  saveState(structuredClone(DEFAULT));
+  return loadState();
+}
+
+export function counts(s){
+  const state = mergeDefaults(s, DEFAULT);
+  return {
+    unused: state.codes.unused.length,
+    redeemed: state.codes.redeemed.length
+  };
+}
+
+export function normalizeCodes(lines){
+  // Accept pasted text (one per line) OR CSV with codes in first column.
+  const out = [];
+  for (const raw of lines){
+    const v = String(raw ?? "").trim();
+    if (!v) continue;
+    // if looks like CSV row, take first cell
+    const first = v.includes(",") ? v.split(",")[0].trim() : v;
+    if (first) out.push(first);
   }
+  // de-dupe while keeping order
+  const seen = new Set();
+  return out.filter(c => (seen.has(c) ? false : (seen.add(c), true)));
 }
 
-export function saveState(state){
-  localStorage.setItem(KEY, JSON.stringify(state));
-}
-
-export function addCodes(state, codeTexts){
-  const existing = new Set(state.codes.map(c => c.codeText.toUpperCase()));
-  const added = [];
-  for (const codeText of codeTexts){
-    const k = codeText.toUpperCase().trim();
-    if (!k) continue;
-    if (existing.has(k)) continue;
-    existing.add(k);
-    const item = {
-      id: uid(),
-      codeText: k,
-      status: "unused",
-      uploadedAt: nowISO()
-    };
-    state.codes.push(item);
-    added.push(item);
+export function addCodes(state, codes){
+  const s = mergeDefaults(state, DEFAULT);
+  const incoming = normalizeCodes(codes);
+  const existing = new Set(s.codes.unused);
+  const existingR = new Set(s.codes.redeemed);
+  for (const c of incoming){
+    if (existing.has(c) || existingR.has(c)) continue;
+    s.codes.unused.push(c);
+    existing.add(c);
   }
-  return added;
+  return s;
 }
 
-export function updateCodeText(state, id, newText){
-  const target = state.codes.find(c => c.id === id);
-  if (!target) return false;
-  target.codeText = newText.toUpperCase().trim();
-  return true;
+export function exportUnused(state){
+  const s = mergeDefaults(state, DEFAULT);
+  return s.codes.unused.slice();
 }
 
-export function deleteCode(state, id){
-  const idx = state.codes.findIndex(c => c.id === id);
-  if (idx === -1) return false;
-  state.codes.splice(idx, 1);
-  return true;
+// Session helpers (front-end simulation)
+export function computeDefaultSessionCap(state){
+  const s = mergeDefaults(state, DEFAULT);
+  const { unused } = counts(s);
+  const dc = String(s.distributor.defaultCap ?? "").trim();
+  if (!dc) return unused;
+  const n = Math.max(0, parseInt(dc, 10) || 0);
+  if (n <= 0) return unused;
+  return Math.min(unused, n);
 }
 
-export function counts(state){
-  const unused = state.codes.filter(c => c.status === "unused").length;
-  const redeemed = state.codes.filter(c => c.status === "claimed").length;
-  return { unused, redeemed, total: state.codes.length };
+export function startSession(state, sessionId){
+  const s = mergeDefaults(state, DEFAULT);
+  const cap = computeDefaultSessionCap(s);
+  s.distributor.sessionActive = true;
+  s.distributor.sessionId = sessionId;
+  s.distributor.sessionCap = cap;
+  s.distributor.claimed = 0;
+  s.distributor.isPaused = false;
+  return s;
+}
+
+export function endSession(state){
+  const s = mergeDefaults(state, DEFAULT);
+  s.distributor.sessionActive = false;
+  s.distributor.sessionId = "";
+  s.distributor.sessionCap = 0;
+  s.distributor.claimed = 0;
+  s.distributor.isPaused = false;
+  return s;
+}
+
+export function setSessionCap(state, cap){
+  const s = mergeDefaults(state, DEFAULT);
+  const n = Math.max(0, parseInt(String(cap ?? "").trim() || "0", 10) || 0);
+  s.distributor.sessionCap = n;
+  // ensure claimed isn't above cap (keep claimed, remaining can go 0)
+  return s;
+}
+
+export function setDefaultCap(state, cap){
+  const s = mergeDefaults(state, DEFAULT);
+  const v = String(cap ?? "").trim();
+  // allow blank; normalize "0" -> blank
+  if (!v || v === "0") s.distributor.defaultCap = "";
+  else s.distributor.defaultCap = String(Math.max(0, parseInt(v,10) || 0));
+  return s;
+}
+
+export function togglePause(state){
+  const s = mergeDefaults(state, DEFAULT);
+  s.distributor.isPaused = !s.distributor.isPaused;
+  return s;
+}
+
+export function claimOne(state){
+  const s = mergeDefaults(state, DEFAULT);
+  if (!s.distributor.sessionActive) return { state: s, ok: false, reason: "inactive" };
+  if (s.distributor.isPaused) return { state: s, ok: false, reason: "paused" };
+  if (s.distributor.claimed >= s.distributor.sessionCap) return { state: s, ok: false, reason: "cap" };
+  s.distributor.claimed += 1;
+  return { state: s, ok: true, reason: "ok" };
 }

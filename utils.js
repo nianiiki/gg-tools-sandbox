@@ -1,14 +1,25 @@
-export function nowISO(){
-  return new Date().toISOString();
+export function uid(len = 12){
+  const a = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let out = "";
+  for (let i=0;i<len;i++) out += a[Math.floor(Math.random()*a.length)];
+  return out;
 }
 
-export function formatLocal(ts){
-  try{
-    const d = new Date(ts);
-    return d.toLocaleString(undefined, { dateStyle: "short", timeStyle: "medium" });
-  }catch{
-    return ts;
-  }
+export function clamp(n, min, max){
+  return Math.max(min, Math.min(max, n));
+}
+
+export function escapeHtml(s){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+export function copyToClipboard(text){
+  return navigator.clipboard?.writeText(String(text)) ?? Promise.reject(new Error("Clipboard unavailable"));
 }
 
 export function downloadText(filename, text){
@@ -21,52 +32,4 @@ export function downloadText(filename, text){
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-}
-
-export async function shareText({ title, text, url }){
-  // Web Share API (best on iOS)
-  if (navigator.share){
-    try{
-      await navigator.share({ title, text, url });
-      return { ok: true };
-    }catch(e){
-      return { ok: false, error: e };
-    }
-  }
-  // Fallback: copy URL
-  if (url){
-    await navigator.clipboard?.writeText(url);
-    return { ok: true, fallback: "copied" };
-  }
-  return { ok: false, fallback: "none" };
-}
-
-export function parseCodesFromText(raw){
-  // Accept CSV or TXT where codes are one-per-line
-  // Also handles accidental commas/quotes by splitting on newlines first.
-  const lines = raw
-    .split(/\r?\n/)
-    .map(s => s.trim())
-    .filter(Boolean);
-
-  // If a "CSV" with one code per line, this is already good.
-  // If a line has commas, take first cell (common export pattern).
-  const codes = lines.map(line => line.split(",")[0].replaceAll('"', "").trim()).filter(Boolean);
-
-  // Deduplicate while preserving order
-  const seen = new Set();
-  const out = [];
-  for (const c of codes){
-    const k = c.toUpperCase();
-    if (!seen.has(k)){
-      seen.add(k);
-      out.push(k);
-    }
-  }
-  return out;
-}
-
-export function makePasscodeURL(code){
-  const c = encodeURIComponent(code);
-  return `https://store.pokemongo.com/offer-redemption?passcode=${c}`;
 }
