@@ -368,3 +368,83 @@ textarea{min-height:92px; resize:vertical}
   pointer-events: none;
   z-index: 9999;
 }
+
+
+/* Inventory (MKXVIII) */
+.stat-card-link{ text-decoration:none; color:inherit; display:block; }
+.inv-list{ display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+.inv-row{ display:flex; gap:10px; align-items:center; justify-content:space-between; padding:10px 12px; border:1px solid rgba(255,255,255,.18); border-radius:14px; background:rgba(255,255,255,.10); }
+.inv-code{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:13px; letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 52vw; }
+.inv-actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.btn.small{ padding:8px 10px; font-size:12px; border-radius:12px; }
+.btn.small.danger{ border-color: rgba(255,80,80,.45); color: rgba(255,230,230,.95); }
+.tabs{ display:flex; gap:10px; }
+.tab{ flex:1; display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.10); text-decoration:none; color:inherit; }
+.tab.active{ background:rgba(255,255,255,.18); }
+.count{ font-weight:700; opacity:.9; }
+.note{ margin-top:10px; font-size:12px; opacity:.85; }
+.mini-pill{ font-size:12px; padding:6px 10px; border-radius:999px; background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.18); }
+
+
+/* Modal (MKXIX) */
+.modal-overlay{
+  position:fixed; inset:0;
+  background: rgba(0,0,0,.55);
+  display:flex; align-items:center; justify-content:center;
+  padding: 18px;
+  z-index: 10000;
+}
+.modal-card{
+  width: min(520px, 92vw);
+  border-radius: 22px;
+  padding: 18px 18px 16px;
+  background: rgba(12, 20, 34, .92);
+  border: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 18px 50px rgba(0,0,0,.45);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.modal-title{ font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+.modal-body{ opacity:.9; line-height: 1.35; }
+.modal-actions{ display:flex; gap:12px; margin-top: 16px; justify-content:flex-end; flex-wrap:wrap; }
+.btn.modal{ padding: 12px 16px; border-radius: 16px; }
+.btn.modal.primary{ font-weight: 800; }
+.btn.modal.secondary{ opacity:.95; }
+
+
+/* Inventory search + inline edit (MKXIX) */
+.inv-toolbar{ margin-top: 12px; margin-bottom: 10px; }
+.inv-search-wrap{
+  display:flex; align-items:center; gap:10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border:1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.12);
+}
+.inv-search{ width:100%; background:transparent; border:0; outline:none; color:inherit; font-size:14px; }
+.inv-search-icon{ opacity:.7; font-size:14px; }
+.inv-row.editing{ align-items:center; }
+.inv-edit{
+  flex:1; min-width: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border:1px solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,.18);
+  color: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+}
+.icon-mini{
+  width: 38px; height: 38px;
+  border-radius: 14px;
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.10);
+  color: inherit;
+  font-size: 16px;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.icon-mini.ok{ border-color: rgba(120,255,160,.35); }
+.icon-mini.cancel{ border-color: rgba(255,120,120,.35); }
+.muted{ opacity:.85; }
+.btn.wide{ width: 100%; margin-top: 10px; display:flex; justify-content:center; gap:10px; }
+.btn-ic{ opacity:.9; }

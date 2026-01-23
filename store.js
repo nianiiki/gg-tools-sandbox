@@ -276,3 +276,63 @@ export function claimOne(state){
 
   return { state: s, ok: true, reason: "ok", code };
 }
+
+    
+// Inventory helpers (MKXVIII)
+export function getUnusedCodes() {
+  const s = loadState();
+  return (s.codes?.unused || s.unusedCodes || []).slice();
+}
+export function getRedeemedCodes() {
+  const s = loadState();
+  return (s.codes?.redeemed || s.redeemedCodes || s.claimedCodes || []).slice();
+}
+export function deleteUnusedCode(code) {
+  const s = loadState();
+  const arr = (s.codes?.unused || s.unusedCodes || []);
+  const next = arr.filter(c => c !== code);
+  if (s.codes?.unused) s.codes.unused = next; else s.unusedCodes = next;
+  saveState(s);
+}
+export function deleteRedeemedCode(code) {
+  const s = loadState();
+  const arr = (s.codes?.redeemed || s.redeemedCodes || s.claimedCodes || []);
+  const next = arr.filter(c => c !== code);
+  if (s.codes?.redeemed) s.codes.redeemed = next;
+  else if (s.redeemedCodes) s.redeemedCodes = next;
+  else s.claimedCodes = next;
+  saveState(s);
+}
+export function moveRedeemedToUnused(code) {
+  const s = loadState();
+  // remove from redeemed
+  const red = (s.codes?.redeemed || s.redeemedCodes || s.claimedCodes || []);
+  const redNext = red.filter(c => c !== code);
+  if (s.codes?.redeemed) s.codes.redeemed = redNext;
+  else if (s.redeemedCodes) s.redeemedCodes = redNext;
+  else s.claimedCodes = redNext;
+  // add to unused
+  const un = (s.codes?.unused || s.unusedCodes || []);
+  const unNext = [code, ...un];
+  if (s.codes?.unused) s.codes.unused = unNext; else s.unusedCodes = unNext;
+  saveState(s);
+}
+
+
+// Inventory edit helpers (MKXIX)
+export function updateUnusedCode(oldCode, newCode) {
+  const s = loadState();
+  const arr = (s.codes?.unused || s.unusedCodes || []);
+  const next = arr.map(c => (c === oldCode ? newCode : c));
+  if (s.codes?.unused) s.codes.unused = next; else s.unusedCodes = next;
+  saveState(s);
+}
+export function updateRedeemedCode(oldCode, newCode) {
+  const s = loadState();
+  const arr = (s.codes?.redeemed || s.redeemedCodes || s.claimedCodes || []);
+  const next = arr.map(c => (c === oldCode ? newCode : c));
+  if (s.codes?.redeemed) s.codes.redeemed = next;
+  else if (s.redeemedCodes) s.redeemedCodes = next;
+  else s.claimedCodes = next;
+  saveState(s);
+}

@@ -1,14 +1,12 @@
-import {
-  loadState, saveState, resetAll,
+import {loadState, saveState, resetAll,
   counts, addCodes, exportUnused,
   startSession, endSession, togglePause, setSessionCap,
   setDefaultCap, computeDefaultSessionCap,
   claimOne, setDistributorSetting,
-  playerAlreadyClaimed, recordPlayerClaim, addReport
-} from "./store.js";
+  playerAlreadyClaimed, recordPlayerClaim, addReport , getUnusedCodes , getRedeemedCodes , deleteUnusedCode , deleteRedeemedCode , moveRedeemedToUnused, updateUnusedCode, updateRedeemedCode} from "./store.js";
 import { uid, copyToClipboard, downloadText, escapeHtml } from "./utils.js";
 
-const APP_VERSION = "MKXVII";
+const APP_VERSION = "MKXIX";
 
 /** tiny DOM helpers (we intentionally do NOT use jQuery) **/
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -633,7 +631,9 @@ function screenClaim(sessionId){
       <div class="stack">
         <div class="card"><div class="cardInner">
           <div class="title">Session Ended</div>
-          <div class="muted">There isn't an active code session right now, or all codes allotted for this session have been claimed.</div>
+          <div class="muted">There isn't an active code session right now, or all codes allotted for this session have been claimed.
+
+<div class="note">Note: This is a local-only build (no backend yet). Claims will only work on the same device/browser that started the session unless Test Mode is enabled.</div></div>
         </div></div>
         ${hasCampfire ? `<button class="pillBtn primary" id="btnCampfire">${Icons.people()} Campfire Group</button>` : ""}
       </div>
@@ -775,7 +775,7 @@ function screenClaim(sessionId){
             <div class="title" style="text-align:center">Code Unlocked</div>
             <div style="height:10px"></div>
             <div class="codeBox">
-              <div class="kicker">CODE</div>
+              <div class="kicker">—</div>
               <div class="codeText">${escapeHtml(code)}</div>
             </div>
 
@@ -898,3 +898,284 @@ function route(){
 
 window.addEventListener("hashchange", route);
 route();
+
+
+function renderInventory(params = {}) {
+  const tab = (params.tab || "unused").toLowerCase();
+  const unused = getUnusedCodes();
+  const redeemed = getRedeemedCodes();
+  const list = tab === "redeemed" ? redeemed : unused;
+
+  const header = `
+    <div class="topbar">
+      <button class="icon-btn" data-action="back" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand">
+        <div class="logo">GG</div>
+        <div>
+          <div class="title">Inventory</div>
+          <div class="subtitle">${tab === "redeemed" ? "Redeemed" : "Unused"}</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" data-action="goUnused" aria-label="Unused">
+          <span class="mini-pill">Unused</span>
+        </button>
+        <button class="icon-btn" data-action="goRedeemed" aria-label="Redeemed">
+          <span class="mini-pill">Redeemed</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  const rows = list.length ? list.map((code) => `
+    <div class="inv-row">
+      <div class="inv-code">${escapeHtml(code)}</div>
+      <div class="inv-actions">
+        <button class="btn small" data-action="copyCode" data-code="${escapeAttr(code)}">Copy</button>
+        ${tab === "redeemed"
+          ? `<button class="btn small" data-action="moveToUnused" data-code="${escapeAttr(code)}">Unredeem</button>
+             <button class="btn small danger" data-action="deleteRedeemed" data-code="${escapeAttr(code)}">Delete</button>`
+          : `<button class="btn small danger" data-action="deleteUnused" data-code="${escapeAttr(code)}">Delete</button>`}
+      </div>
+    </div>
+  `).join("") : `<div class="empty">No codes in this list.</div>`;
+
+  $("#app").innerHTML = `
+    ${header}
+    <div class="card pad">
+      <div class="tabs">
+        <a class="tab ${tab==="unused"?"active":""}" href="#/inventory?tab=unused">Unused <span class="count">${unused.length}</span></a>
+        <a class="tab ${tab==="redeemed"?"active":""}" href="#/inventory?tab=redeemed">Redeemed <span class="count">${redeemed.length}</span></a>
+      </div>
+      <div class="inv-list">${rows}</div>
+    </div>
+  `;
+
+  // Event delegation
+  $("#app").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const action = btn.getAttribute("data-action");
+    const code = btn.getAttribute("data-code");
+
+    if (action === "back") history.back();
+    if (action === "goUnused") location.hash = "#/inventory?tab=unused";
+    if (action === "goRedeemed") location.hash = "#/inventory?tab=redeemed";
+
+    if (action === "copyCode" && code) {
+      navigator.clipboard?.writeText(code);
+      toast("Copied");
+    }
+    if (action === "deleteUnused" && code) {
+      deleteUnusedCode(code);
+      renderInventory({ tab: "unused" });
+      toast("Deleted");
+    }
+    if (action === "deleteRedeemed" && code) {
+      deleteRedeemedCode(code);
+      renderInventory({ tab: "redeemed" });
+      toast("Deleted");
+    }
+    if (action === "moveToUnused" && code) {
+      moveRedeemedToUnused(code);
+      renderInventory({ tab: "redeemed" });
+      toast("Moved to unused");
+    }
+  }, { once: true });
+}
+
+
+/* MKXIX OVERRIDES: inventory polish + modal */
+
+/** Basic HTML escaping helpers (fallbacks) */
+function _mkEscapeHtml(str) {
+  return String(str ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+function _mkEscapeAttr(str) { return _mkEscapeHtml(str); }
+
+function showModalMK({ title, bodyHtml, primaryText = "OK", onPrimary, secondaryText, onSecondary }) {
+  const existing = document.getElementById("modalOverlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "modalOverlay";
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-title">${_mkEscapeHtml(title || "")}</div>
+      <div class="modal-body">${bodyHtml || ""}</div>
+      <div class="modal-actions">
+        ${secondaryText ? `<button class="btn modal secondary" data-action="secondary">${_mkEscapeHtml(secondaryText)}</button>` : ""}
+        <button class="btn modal primary" data-action="primary">${_mkEscapeHtml(primaryText)}</button>
+      </div>
+    </div>
+  `;
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+      onPrimary && onPrimary();
+    }
+  });
+  overlay.querySelectorAll("[data-action]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const a = btn.getAttribute("data-action");
+      overlay.remove();
+      if (a === "primary") onPrimary && onPrimary();
+      if (a === "secondary") onSecondary && onSecondary();
+    });
+  });
+  document.body.appendChild(overlay);
+}
+
+// Replace/override renderInventory with a more reference-like version.
+function renderInventory(params = {}) {
+  const tab = (params.tab || "unused").toLowerCase();
+  const q = (params.q || "").toLowerCase();
+
+  const unused = getUnusedCodes();
+  const redeemed = getRedeemedCodes();
+
+  const list = tab === "redeemed" ? redeemed : unused;
+  const filtered = q ? list.filter(c => String(c).toLowerCase().includes(q)) : list;
+
+  const header = `
+    <div class="topbar">
+      <button class="icon-btn" data-action="back" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand">
+        <div class="logo">GG</div>
+        <div>
+          <div class="title">${tab === "redeemed" ? "Redeemed Codes" : "Unused Codes"}</div>
+          <div class="subtitle">${tab === "redeemed" ? "Tap a code to manage" : "Tap a code to manage"}</div>
+        </div>
+      </div>
+      <div class="topbar-actions"></div>
+    </div>
+  `;
+
+  const exportBtn = tab === "unused" ? `
+    <button class="btn wide" data-action="exportUnused">
+      <span class="btn-ic">⬇</span>
+      Export Unused (TXT)
+    </button>` : ``;
+
+  const rows = filtered.length ? filtered.map((code) => `
+    <div class="inv-row" data-code-row="${_mkEscapeAttr(code)}">
+      <div class="inv-code">${_mkEscapeHtml(code)}</div>
+      <div class="inv-actions">
+        <button class="icon-mini" data-action="startEdit" data-code="${_mkEscapeAttr(code)}" aria-label="Edit">✎</button>
+        <button class="icon-mini" data-action="deleteCode" data-code="${_mkEscapeAttr(code)}" aria-label="Delete">🗑</button>
+      </div>
+    </div>
+  `).join("") : `<div class="empty">No codes in this list.</div>`;
+
+  const tabs = `
+    <div class="tabs">
+      <a class="tab ${tab==="unused"?"active":""}" href="#/inventory?tab=unused&q=${encodeURIComponent(params.q||"")}">Unused <span class="count">${unused.length}</span></a>
+      <a class="tab ${tab==="redeemed"?"active":""}" href="#/inventory?tab=redeemed&q=${encodeURIComponent(params.q||"")}">Redeemed <span class="count">${redeemed.length}</span></a>
+    </div>
+  `;
+
+  const search = `
+    <div class="inv-toolbar">
+      <div class="inv-search-wrap">
+        <span class="inv-search-icon">🔎</span>
+        <input class="inv-search" placeholder="Search codes..." value="${_mkEscapeAttr(params.q || "")}" />
+      </div>
+    </div>
+  `;
+
+  $("#app").innerHTML = `
+    ${header}
+    <div class="card pad">
+      ${tabs}
+      ${search}
+      ${exportBtn}
+      <div class="inv-list">${rows}</div>
+    </div>
+  `;
+
+  const searchInput = document.querySelector(".inv-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      const nextQ = searchInput.value || "";
+      location.hash = `#/inventory?tab=${encodeURIComponent(tab)}&q=${encodeURIComponent(nextQ)}`;
+    });
+  }
+
+  $("#app").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const action = btn.getAttribute("data-action");
+    const code = btn.getAttribute("data-code");
+
+    if (action === "back") { history.back(); return; }
+
+    if (action === "exportUnused") {
+      const codes = getUnusedCodes().join("\n");
+      const stamp = new Date().toISOString().slice(0,10);
+      const blob = new Blob([codes], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `unused-codes-${stamp}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      toast("Exported");
+      return;
+    }
+
+    if (action === "startEdit" && code) {
+      const row = btn.closest(".inv-row");
+      if (!row) return;
+      row.classList.add("editing");
+      row.innerHTML = `
+        <input class="inv-edit" value="${_mkEscapeAttr(code)}" />
+        <div class="inv-actions">
+          <button class="icon-mini ok" data-action="saveEdit" data-code="${_mkEscapeAttr(code)}" aria-label="Save">✓</button>
+          <button class="icon-mini cancel" data-action="cancelEdit" aria-label="Cancel">✕</button>
+        </div>
+      `;
+      row.querySelector(".inv-edit")?.focus();
+      return;
+    }
+
+    if (action === "saveEdit" && code) {
+      const row = btn.closest(".inv-row");
+      const input = row?.querySelector(".inv-edit");
+      const next = (input?.value || "").trim();
+      if (!next) { toast("Code can't be empty"); return; }
+      if (tab === "redeemed") updateRedeemedCode(code, next);
+      else updateUnusedCode(code, next);
+      renderInventory({ tab, q: params.q || "" });
+      toast("Updated");
+      return;
+    }
+
+    if (action === "cancelEdit") {
+      renderInventory({ tab, q: params.q || "" });
+      return;
+    }
+
+    if (action === "deleteCode" && code) {
+      showModalMK({
+        title: "Delete this code?",
+        bodyHtml: `<div class="muted">This will remove <b>${_mkEscapeHtml(code)}</b> from ${_mkEscapeHtml(tab)}.</div>`,
+        primaryText: "Delete",
+        secondaryText: "Cancel",
+        onPrimary: () => {
+          if (tab === "redeemed") deleteRedeemedCode(code);
+          else deleteUnusedCode(code);
+          renderInventory({ tab, q: params.q || "" });
+          toast("Deleted");
+        }
+      });
+      return;
+    }
+  }, { once: true });
+}
