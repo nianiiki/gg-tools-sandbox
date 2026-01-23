@@ -347,3 +347,24 @@ textarea{min-height:92px; resize:vertical}
   margin-top: 6px;
   word-break: break-word;
 }
+
+
+/* Version badge (bottom center) */
+.version-badge{
+  position: fixed;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: .08em;
+  opacity: .7;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.25);
+  border: 1px solid rgba(255,255,255,.25);
+  color: rgba(255,255,255,.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+  z-index: 9999;
+}

@@ -5,13 +5,21 @@ import {
   setDefaultCap, computeDefaultSessionCap,
   claimOne, setDistributorSetting,
   playerAlreadyClaimed, recordPlayerClaim, addReport
-} from "./store.MKXV.js";
+} from "./store.js";
 import { uid, copyToClipboard, downloadText, escapeHtml } from "./utils.js";
+
+const APP_VERSION = "MKXVII";
 
 /** tiny DOM helpers (we intentionally do NOT use jQuery) **/
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+
+
+function setVersionBadge() {
+  const el = document.getElementById("versionBadge");
+  if (el) el.textContent = APP_VERSION;
+}
 const view = $("#view");
 if (!view) throw new Error("Missing #view container");
 
